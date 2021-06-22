@@ -1,9 +1,3 @@
-# -*- encoding: utf-8 -*-
-#File    :   cityscapes_dataset.py
-#Time    :   2021/06/01 17:37:10
-#Author  :   Chen 
-#Version :   1.0
-
 import os
 import os.path as osp
 import numpy as np
