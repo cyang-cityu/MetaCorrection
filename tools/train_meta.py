@@ -228,8 +228,6 @@ def main():
     interp = nn.Upsample(size=(h, w), mode='bilinear', align_corners=True)
     interp_target = nn.Upsample(size=(h, w), mode='bilinear', align_corners=True)
 
-    T1 = torch.eye(19, 19)
-    T2 = torch.eye(19, 19)
 
     # set up tensor board
     if args.tensorboard:
@@ -258,8 +256,8 @@ def main():
             image = to_var(image, requires_grad=False)
             label = to_var(label, requires_grad=False)
 
-            T1 = to_var(T1)
-            T2 = to_var(T2)
+            T1 = to_var(torch.eye(19, 19))
+            T2 = to_var(torch.eye(19, 19))
 
             y_f_hat1, y_f_hat2 = meta_net(image)
             y_f_hat1 = torch.softmax(interp_target(y_f_hat1), dim=1).permute(0, 2, 3, 1).contiguous().view(-1, args.num_classes)
