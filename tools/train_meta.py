@@ -357,7 +357,7 @@ def main():
             print('Finish Evaluation: '+time.asctime(time.localtime(time.time())))
             if mIoU > best_mIoU:
                 best_mIoU = mIoU
-                torch.save(main_model.state_dict(), osp.join(args.log_dir, 'Uncertainty_LTIR_best.pth'))
+                torch.save(main_model.state_dict(), osp.join(args.log_dir, 'MetaCorrection_best.pth'))
 
     if args.tensorboard:
         writer.close()
