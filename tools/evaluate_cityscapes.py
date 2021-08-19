@@ -112,8 +112,9 @@ def evaluate(seg_model, pred_dir='/home/cyang53/CED/Ours/MetaCorrection-CVPR/res
     T = np.load('/home/cyang53/CED/Ours/MetaCorrection-CVPR/snapshots/Source_500.npy')
     device = torch.device("cuda")
     #print(device)
-    model = seg_model.to(device)
-
+    seg_model = seg_model.to(device)
+    model = DeeplabMulti(num_classes=19).to(device)
+    model.load_state_dict(seg_model.state_dict())
     model.eval()
 
     testloader = data.DataLoader(cityscapesDataSet(DATA_DIRECTORY, DATA_LIST_PATH, crop_size=(1024, 512), mean=IMG_MEAN, scale=False, mirror=False, set=SET),
