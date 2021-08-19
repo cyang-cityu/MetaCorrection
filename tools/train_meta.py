@@ -31,8 +31,8 @@ MODEL = 'LTIR'
 BATCH_SIZE = 1
 ITER_SIZE = 1
 NUM_WORKERS = 4
-DATA_DIRECTORY = '/home/cyang53/CED/Data/UDA_Natural/Cityscapes'
-DATA_LIST_PATH = '/home/cyang53/CED/Ours/MetaCorrection-CVPR/datasets/gta5_list/meta.lst'
+DATA_DIRECTORY = '/home/cyang53/CED/Data/UDA_Natural/GTA5'
+DATA_LIST_PATH = '/home/cyang53/CED/Ours/MetaCorrection-CVPR/datasets/gta5_list/train.lst'
 IGNORE_LABEL = 255
 INPUT_SIZE = '1024, 512'
 DATA_DIRECTORY_TARGET = '/home/cyang53/CED/Data/UDA_Natural/Cityscapes'
@@ -180,6 +180,19 @@ def loss_calc(pred, label):
 
     return criterion(pred, label)
 
+def obtain_meta(source_img):
+    seg_model = DeeplabMulti(num_classes=19).cuda()
+    seg_model.load_state_dict(torch.load('/home/cyang53/CED/Baseline/AdaptSegNet-CVPR2018/snapshots/GTA5_best.pth'))
+    dis_model = FCDiscriminator(num_classes=19).cuda()
+    dis_model.load_state_dict(torch.load('/home/cyang53/CED/Ours/AdaptSegNet-CVPR2018/snapshots/GTA5_best_D2.pth'))
+    seg_model.eval()
+    dis_model.eval()
+
+    output1, output2 = seg_model(source_img)
+    meta_map = dis_model(F.softmax(output2, dim=1)).cpu().data[0]
+    source_like = torch.where(meta_map < 0.5)
+    return source_like
+
 def main():
     """Create the model and start the training."""
     if not os.path.exists(args.log_dir):
@@ -275,6 +288,8 @@ def main():
             x_val, y_val, _, _ = next(iter(metaloader))
             x_val = to_var(x_val, requires_grad=False)
             y_val = to_var(y_val, requires_grad=False)
+            meta_source = obtain_meta(x_val)
+            y_val[meta_source] = 255
 
             y_g_hat1, y_g_hat2 = meta_net(x_val)
             y_g_hat1 = torch.softmax(interp(y_g_hat1), dim=1)
@@ -283,12 +298,7 @@ def main():
             l_g_meta = loss_calc(y_g_hat2, y_val) + 0.1 * loss_calc(y_g_hat1, y_val)
             grad_eps1 = torch.autograd.grad(l_g_meta, T1, only_inputs=True, retain_graph=True)[0]
             grad_eps2 = torch.autograd.grad(l_g_meta, T2, only_inputs=True)[0]
-            #print(torch.max(grad_eps1), torch.max(grad_eps2))
 
-            # norm_grad1 = torch.max(torch.abs(grad_eps1), 1)[0].unsqueeze(1)
-            # one = torch.ones_like(norm_grad1)
-            # norm_grad1 = torch.where(norm_grad1 == 0, one, norm_grad1)
-            # grad_eps1 = torch.div(grad_eps1, norm_grad1)
             grad_eps1 = grad_eps1 / torch.max(grad_eps1)
             T1 = torch.clamp(T1-0.11*grad_eps1,min=0)
             # T1 = torch.softmax(T1, 1)
@@ -298,14 +308,8 @@ def main():
                 if norm_c[j] != 0:
                     T1[j, :] /= norm_c[j]
 
-
-            # norm_grad2 = torch.max(torch.abs(grad_eps2), 1)[0].unsqueeze(1)
-            # one = torch.ones_like(norm_grad2)
-            # norm_grad2 = torch.where(norm_grad2 == 0, one, norm_grad2)
-            # grad_eps2 = torch.div(grad_eps2, norm_grad2)
             grad_eps2 = grad_eps2 / torch.max(grad_eps2)
             T2 = torch.clamp(T2-0.11*grad_eps2,min=0)
-            # T2 = torch.softmax(T2, 1)
 
             norm_c = torch.sum(T2, 1)
 
@@ -313,38 +317,6 @@ def main():
             for j in range(args.num_classes):
                 if norm_c[j] != 0:
                     T2[j, :] /= norm_c[j]
-
-            # print(T2)
-            # norm_grad1 = torch.max(torch.abs(grad_eps1), 1)[0].unsqueeze(1)
-            
-            # one = torch.ones_like(norm_grad1)
-            # norm_grad1 = torch.where(norm_grad1 == 0, one, norm_grad1)
-            
-            # # print(torch.count_nonzero(norm_grad1))
-            # # print(grad_eps1.size(), norm_grad1.size())
-            # grad_eps1 = torch.div(grad_eps1, norm_grad1)
-            # T1 = torch.clamp(T1 - args.t_weight * grad_eps1, min=0)
-            # norm_c = torch.sum(T1, 1).unsqueeze(1)
-
-            # T1 = torch.div(T1, norm_c)
-
-            # # for j in range(19):
-            # #     if norm_c[:, j] != 0:
-            # #         T1[:, :, j] /= norm_c[:, j]
-            # norm_grad2 = torch.max(torch.abs(grad_eps2), 1)[0].unsqueeze(1)
-            # norm_grad2 = torch.where(norm_grad2 == 0, one, norm_grad2)
-            
-            # grad_eps2 = torch.div(grad_eps2, norm_grad2)
-            # T2 = torch.clamp(T2 - args.t_weight * grad_eps2, min=0)
-            # norm_c = torch.sum(T2, 1).unsqueeze(1)
-
-            # T2 = torch.div(T2, norm_c)
-            #print(T1, T2)
-            # for j in range(19):
-            #     if norm_c[:, j] != 0:
-            #         T2[:, :, j] /= norm_c[:, j]
-
-            # print(T1, T2)
 
             y_f_hat1, y_f_hat2 = main_model(image)
             y_f_hat1 = torch.softmax(interp_target(y_f_hat1), dim=1).permute(0, 2, 3, 1).contiguous().view(-1, args.num_classes)
