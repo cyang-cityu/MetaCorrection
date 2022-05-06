@@ -104,12 +104,11 @@ def colorize_mask(mask):
 
     return new_mask
 
-def evaluate(seg_model, pred_dir='/home/cyang53/CED/Ours/MetaCorrection-CVPR/result/cityscapes', post=False):
+def evaluate(seg_model, pred_dir='/home/cyang53/CED/Ours/MetaCorrection-CVPR/result/cityscapes'):
     """Create the model and start the evaluation process."""
 
     if not os.path.exists(pred_dir):
         os.makedirs(pred_dir)
-    T = np.load('/home/cyang53/CED/Ours/MetaCorrection-CVPR/snapshots/Source_500.npy')
     device = torch.device("cuda")
     #print(device)
     seg_model = seg_model.to(device)
@@ -130,17 +129,7 @@ def evaluate(seg_model, pred_dir='/home/cyang53/CED/Ours/MetaCorrection-CVPR/res
         output1, output2 = model(image)
 
         #tta_model = tta.SegmentationTTAWrapper(model, tta.aliases.d4_transform(), merge_mode='mean')
-        if post:
-            output = torch.softmax(interp(0.55 * output1 + 0.45 * output2), dim=1).cpu().data[0].numpy()
-            output = np.reshape(output, (NUM_CLASSES, -1))
-            output = np.dot(np.linalg.inv(T), output)
-            # print(T)
-            # output = np.dot(np.linalg.inv(T), output)
-            # output = np.dot(np.linalg.inv(T), output)
-            output = np.reshape(output, (NUM_CLASSES, 1024, 2048))
-        else:
-            output = interp(0.45 * output2 + 0.55 * output1).cpu().data[0].numpy()
-
+        output = interp(0.45 * output2 + 0.55 * output1).cpu().data[0].numpy()
         output = output.transpose(1,2,0)
         output = np.asarray(np.argmax(output, axis=2), dtype=np.uint8)
         output_col = colorize_mask(output)
